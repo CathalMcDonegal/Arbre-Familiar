@@ -1,14 +1,15 @@
 /**
- * Arbre Genealògic - App senzilla i privada
+ * Arbre Genealògic - App senzilla i privada (versió muntanya)
  * Dades desades a localStorage
  */
 
-const STORAGE_KEY = "arbre-genealogic-v1";
+const STORAGE_KEY = "arbre-genealogic-v2";
 
 // ---------- Estat ----------
 let people = []; // { id, name, birth, death, gender, notes, fatherId, motherId, spouseId }
 let currentRootId = null;
 let scale = 1;
+let menuPersonId = null;
 
 // ---------- DOM ----------
 const form = document.getElementById("person-form");
@@ -43,6 +44,23 @@ const closeRelationsBtn = document.getElementById("close-relations");
 
 let editingRelationsId = null;
 
+// Menú contextual flotant
+const personMenu = document.createElement("div");
+personMenu.className = "person-menu";
+personMenu.innerHTML = `
+  <button data-action="add-father">➕ Afegir pare</button>
+  <button data-action="add-mother">➕ Afegir mare</button>
+  <button data-action="add-sibling">➕ Afegir germà/germana</button>
+  <button data-action="add-child">➕ Afegir fill/a</button>
+  <div class="menu-divider"></div>
+  <button data-action="add-spouse">➕ Afegir cònjuge</button>
+  <button data-action="edit">✏️ Editar</button>
+  <button data-action="center">🎯 Centrar a l'arbre</button>
+  <div class="menu-divider"></div>
+  <button data-action="delete" style="color:#8b3a3a">🗑️ Eliminar</button>
+`;
+document.body.appendChild(personMenu);
+
 // ---------- Utilitats ----------
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -72,6 +90,203 @@ function yearsStr(p) {
   return `† ${p.death}`;
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// ---------- Crear persona ràpida (des del menú) ----------
+function promptNewPerson(relationLabel) {
+  const name = prompt(`Nom del/de la ${relationLabel}:`);
+  if (!name || !name.trim()) return null;
+  const gender = prompt("Gènere (d = dona, h = home, deixar buit = no especificat):", "") || "unknown";
+  let g = "unknown";
+  if (gender.toLowerCase().startsWith("d")) g = "female";
+  else if (gender.toLowerCase().startsWith("h")) g = "male";
+  else if (gender.toLowerCase().startsWith("a")) g = "other";
+
+  const p = {
+    id: uid(),
+    name: name.trim(),
+    birth: null,
+    death: null,
+    gender: g,
+    notes: "",
+    fatherId: null,
+    motherId: null,
+    spouseId: null,
+  };
+  people.push(p);
+  return p;
+}
+
+function addFather(ofId) {
+  const of = getPerson(ofId);
+  if (!of) return;
+  if (of.fatherId) {
+    alert("Aquesta persona ja té pare. Edita les relacions si vols canviar-lo.");
+    return;
+  }
+  const neu = promptNewPerson("pare");
+  if (!neu) return;
+  neu.gender = neu.gender === "unknown" ? "male" : neu.gender;
+  of.fatherId = neu.id;
+  // si ja té mare, opcionalment enllaçar cònjuge
+  if (of.motherId) {
+    const mare = getPerson(of.motherId);
+    if (mare && !mare.spouseId) {
+      mare.spouseId = neu.id;
+      neu.spouseId = mare.id;
+    }
+  }
+  currentRootId = ofId; // mantenim centrats a la persona original
+  save();
+  renderAll();
+}
+
+function addMother(ofId) {
+  const of = getPerson(ofId);
+  if (!of) return;
+  if (of.motherId) {
+    alert("Aquesta persona ja té mare. Edita les relacions si vols canviar-la.");
+    return;
+  }
+  const neu = promptNewPerson("mare");
+  if (!neu) return;
+  neu.gender = neu.gender === "unknown" ? "female" : neu.gender;
+  of.motherId = neu.id;
+  if (of.fatherId) {
+    const pare = getPerson(of.fatherId);
+    if (pare && !pare.spouseId) {
+      pare.spouseId = neu.id;
+      neu.spouseId = pare.id;
+    }
+  }
+  currentRootId = ofId;
+  save();
+  renderAll();
+}
+
+function addSibling(ofId) {
+  const of = getPerson(ofId);
+  if (!of) return;
+  if (!of.fatherId && !of.motherId) {
+    alert("Primer afegeix el pare o la mare d'aquesta persona per poder afegir germans.");
+    return;
+  }
+  const neu = promptNewPerson("germà/germana");
+  if (!neu) return;
+  neu.fatherId = of.fatherId;
+  neu.motherId = of.motherId;
+  currentRootId = ofId;
+  save();
+  renderAll();
+}
+
+function addChild(ofId) {
+  const of = getPerson(ofId);
+  if (!of) return;
+  const neu = promptNewPerson("fill/a");
+  if (!neu) return;
+  // assignem com a fill: si és home → pare, si dona → mare, si no → segons gènere preferent
+  if (of.gender === "male") {
+    neu.fatherId = of.id;
+    if (of.spouseId) neu.motherId = of.spouseId;
+  } else if (of.gender === "female") {
+    neu.motherId = of.id;
+    if (of.spouseId) neu.fatherId = of.spouseId;
+  } else {
+    // desconegut: posem com a pare per defecte
+    neu.fatherId = of.id;
+    if (of.spouseId) neu.motherId = of.spouseId;
+  }
+  currentRootId = ofId;
+  save();
+  renderAll();
+}
+
+function addSpouse(ofId) {
+  const of = getPerson(ofId);
+  if (!of) return;
+  if (of.spouseId) {
+    alert("Aquesta persona ja té cònjuge. Edita les relacions si vols canviar-lo.");
+    return;
+  }
+  const neu = promptNewPerson("cònjuge");
+  if (!neu) return;
+  of.spouseId = neu.id;
+  neu.spouseId = of.id;
+  // gènere complementari si es pot
+  if (of.gender === "male" && neu.gender === "unknown") neu.gender = "female";
+  if (of.gender === "female" && neu.gender === "unknown") neu.gender = "male";
+  currentRootId = ofId;
+  save();
+  renderAll();
+}
+
+// ---------- Menú contextual ----------
+function showPersonMenu(personId, x, y) {
+  menuPersonId = personId;
+  personMenu.classList.add("open");
+  // posicionar
+  const menuW = 210;
+  const menuH = 320;
+  let left = x;
+  let top = y;
+  if (left + menuW > window.innerWidth) left = window.innerWidth - menuW - 8;
+  if (top + menuH > window.innerHeight) top = window.innerHeight - menuH - 8;
+  personMenu.style.left = left + "px";
+  personMenu.style.top = top + "px";
+}
+
+function hidePersonMenu() {
+  personMenu.classList.remove("open");
+  menuPersonId = null;
+}
+
+personMenu.addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn || !menuPersonId) return;
+  const action = btn.dataset.action;
+  const id = menuPersonId;
+  hidePersonMenu();
+
+  if (action === "add-father") addFather(id);
+  else if (action === "add-mother") addMother(id);
+  else if (action === "add-sibling") addSibling(id);
+  else if (action === "add-child") addChild(id);
+  else if (action === "add-spouse") addSpouse(id);
+  else if (action === "edit") editPerson(id);
+  else if (action === "center") {
+    currentRootId = id;
+    renderAll();
+  } else if (action === "delete") {
+    const p = getPerson(id);
+    if (!p) return;
+    if (!confirm(`Vols eliminar ${p.name}?`)) return;
+    people.forEach((other) => {
+      if (other.fatherId === id) other.fatherId = null;
+      if (other.motherId === id) other.motherId = null;
+      if (other.spouseId === id) other.spouseId = null;
+    });
+    people = people.filter((x) => x.id !== id);
+    if (currentRootId === id) {
+      currentRootId = people.length ? people[0].id : null;
+    }
+    save();
+    renderAll();
+  }
+});
+
+document.addEventListener("click", (e) => {
+  if (!personMenu.contains(e.target) && !e.target.closest(".person-card")) {
+    hidePersonMenu();
+  }
+});
+
 // ---------- Render llista de persones ----------
 function renderPeopleList(filter = "") {
   const q = filter.trim().toLowerCase();
@@ -92,28 +307,26 @@ function renderPeopleList(filter = "") {
     .sort((a, b) => a.name.localeCompare(b.name, "ca"))
     .forEach((p) => {
       const li = document.createElement("li");
+      if (p.id === currentRootId) li.classList.add("active");
       li.innerHTML = `
         <span class="name" title="${p.name}">${p.name}</span>
         <span class="actions">
-          <button title="Relacions" data-rel="${p.id}">🔗</button>
+          <button title="Menú" data-menu="${p.id}">⋮</button>
           <button title="Editar" data-edit="${p.id}">✏️</button>
           <button title="Eliminar" data-del="${p.id}">🗑️</button>
         </span>
       `;
+      li.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return;
+        currentRootId = p.id;
+        renderAll();
+      });
       peopleList.appendChild(li);
     });
 }
 
 // ---------- Selectors ----------
 function fillPersonSelects() {
-  const options =
-    `<option value="">— Cap —</option>` +
-    people
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name, "ca"))
-      .map((p) => `<option value="${p.id}">${p.name}</option>`)
-      .join("");
-
   rootSelect.innerHTML =
     `<option value="">— Selecciona una persona —</option>` +
     people
@@ -159,11 +372,15 @@ function editPerson(id) {
   saveBtn.textContent = "Actualitzar persona";
   cancelBtn.hidden = false;
   nameInput.focus();
+  // centrar també
+  currentRootId = id;
+  renderTree();
 }
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
   const id = personIdInput.value || uid();
+  const isNew = !personIdInput.value;
   const data = {
     id,
     name: nameInput.value.trim(),
@@ -178,7 +395,6 @@ form.addEventListener("submit", (e) => {
 
   const existing = getPerson(id);
   if (existing) {
-    // conservar relacions
     data.fatherId = existing.fatherId;
     data.motherId = existing.motherId;
     data.spouseId = existing.spouseId;
@@ -187,6 +403,8 @@ form.addEventListener("submit", (e) => {
     people.push(data);
   }
 
+  // Cada persona nova (o actualitzada) va directament a l'arbre
+  currentRootId = id;
   save();
   resetForm();
   renderAll();
@@ -198,6 +416,7 @@ cancelBtn.addEventListener("click", resetForm);
 peopleList.addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
+  e.stopPropagation();
 
   if (btn.dataset.edit) {
     editPerson(btn.dataset.edit);
@@ -206,18 +425,20 @@ peopleList.addEventListener("click", (e) => {
     const p = getPerson(id);
     if (!p) return;
     if (!confirm(`Vols eliminar ${p.name}?`)) return;
-    // netejar referències
     people.forEach((other) => {
       if (other.fatherId === id) other.fatherId = null;
       if (other.motherId === id) other.motherId = null;
       if (other.spouseId === id) other.spouseId = null;
     });
     people = people.filter((x) => x.id !== id);
-    if (currentRootId === id) currentRootId = null;
+    if (currentRootId === id) {
+      currentRootId = people.length ? people[0].id : null;
+    }
     save();
     renderAll();
-  } else if (btn.dataset.rel) {
-    openRelations(btn.dataset.rel);
+  } else if (btn.dataset.menu) {
+    const rect = btn.getBoundingClientRect();
+    showPersonMenu(btn.dataset.menu, rect.left, rect.bottom + 4);
   }
 });
 
@@ -225,7 +446,7 @@ searchInput.addEventListener("input", () => {
   renderPeopleList(searchInput.value);
 });
 
-// ---------- Relacions ----------
+// ---------- Relacions (modal antic, encara disponible) ----------
 function openRelations(id) {
   const p = getPerson(id);
   if (!p) return;
@@ -247,7 +468,6 @@ relationsForm.addEventListener("submit", (e) => {
   p.motherId = motherSelect.value || null;
   const newSpouse = spouseSelect.value || null;
 
-  // sincronitzar cònjuge bidireccional
   if (p.spouseId && p.spouseId !== newSpouse) {
     const old = getPerson(p.spouseId);
     if (old && old.spouseId === p.id) old.spouseId = null;
@@ -256,7 +476,6 @@ relationsForm.addEventListener("submit", (e) => {
   if (newSpouse) {
     const s = getPerson(newSpouse);
     if (s) {
-      // si el nou cònjuge ja tenia parella, netejar
       if (s.spouseId && s.spouseId !== p.id) {
         const prev = getPerson(s.spouseId);
         if (prev) prev.spouseId = null;
@@ -276,20 +495,18 @@ closeRelationsBtn.addEventListener("click", () => relationsModal.close());
 function createCard(p) {
   const div = document.createElement("div");
   div.className = `person-card ${p.gender || "unknown"}`;
+  if (p.id === currentRootId) div.classList.add("selected");
+  div.dataset.id = p.id;
   div.innerHTML = `
     <div class="pname">${escapeHtml(p.name)}</div>
     <div class="pyears">${yearsStr(p)}</div>
     ${p.notes ? `<div class="pnotes" title="${escapeHtml(p.notes)}">${escapeHtml(p.notes)}</div>` : ""}
   `;
+  div.addEventListener("click", (e) => {
+    e.stopPropagation();
+    showPersonMenu(p.id, e.clientX, e.clientY);
+  });
   return div;
-}
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function getChildren(parentId) {
@@ -302,18 +519,27 @@ function renderTree() {
   treeCanvas.innerHTML = "";
   treeCanvas.style.transform = `scale(${scale})`;
 
-  if (!currentRootId) {
-    treeCanvas.innerHTML = `<p class="empty-state">Afegeix persones i selecciona'n una per veure l'arbre genealògic.</p>`;
+  // Si no hi ha root però hi ha persones → agafem la primera
+  if (!currentRootId && people.length > 0) {
+    currentRootId = people[0].id;
+  }
+
+  if (!currentRootId || people.length === 0) {
+    treeCanvas.innerHTML = `<p class="empty-state">Afegeix una persona amb el formulari de l'esquerra.<br>Després clica-la a l'arbre per afegir família.</p>`;
     return;
   }
 
   const root = getPerson(currentRootId);
   if (!root) {
-    treeCanvas.innerHTML = `<p class="empty-state">Persona no trobada.</p>`;
-    return;
+    currentRootId = people.length ? people[0].id : null;
+    if (!currentRootId) {
+      treeCanvas.innerHTML = `<p class="empty-state">Afegeix una persona amb el formulari de l'esquerra.</p>`;
+      return;
+    }
+    return renderTree();
   }
 
-  // --- Avantpassats (màx 3 generacions cap amunt) ---
+  // --- Avantpassats (màx 3 generacions) ---
   const ancestorLevels = [];
   let currentLevel = [root];
   for (let i = 0; i < 3; i++) {
@@ -329,11 +555,10 @@ function renderTree() {
       }
     });
     if (next.length === 0) break;
-    ancestorLevels.unshift(next); // els més antics primer
+    ancestorLevels.unshift(next);
     currentLevel = next;
   }
 
-  // Render avantpassats
   ancestorLevels.forEach((level) => {
     const gen = document.createElement("div");
     gen.className = "generation";
@@ -342,7 +567,6 @@ function renderTree() {
       unit.className = "family-unit";
       const couple = document.createElement("div");
       couple.className = "couple";
-
       couple.appendChild(createCard(p));
       if (p.spouseId) {
         const s = getPerson(p.spouseId);
@@ -384,12 +608,10 @@ function renderTree() {
 
     const kidsRow = document.createElement("div");
     kidsRow.className = "children-row";
-    children.forEach((c) => {
-      kidsRow.appendChild(createCard(c));
-    });
+    children.forEach((c) => kidsRow.appendChild(createCard(c)));
     centerUnit.appendChild(kidsRow);
 
-    // Néts (1 nivell)
+    // Néts
     const grandKids = [];
     children.forEach((c) => {
       getChildren(c.id).forEach((g) => {
@@ -411,7 +633,7 @@ function renderTree() {
   treeCanvas.appendChild(centerGen);
 }
 
-// ---------- Controls de zoom ----------
+// ---------- Zoom ----------
 function applyZoom() {
   treeCanvas.style.transform = `scale(${scale})`;
 }
@@ -432,6 +654,7 @@ zoomResetBtn.addEventListener("click", () => {
 rootSelect.addEventListener("change", () => {
   currentRootId = rootSelect.value || null;
   renderTree();
+  renderPeopleList(searchInput.value);
 });
 
 // ---------- Export / Import / Clear ----------
@@ -458,7 +681,7 @@ importFile.addEventListener("change", () => {
       if (!Array.isArray(data)) throw new Error("Format invàlid");
       if (!confirm(`Vols importar ${data.length} persones? Es reemplaçaran les dades actuals.`)) return;
       people = data;
-      currentRootId = null;
+      currentRootId = people.length ? people[0].id : null;
       save();
       renderAll();
       alert("Importació correcta");
@@ -487,4 +710,7 @@ function renderAll() {
 
 // ---------- Inici ----------
 load();
+if (people.length > 0 && !currentRootId) {
+  currentRootId = people[0].id;
+}
 renderAll();
