@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arbre Genealògic</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌳</text></svg>" />
+</head>
+<body>
+  <header>
+    <h1>🌳 Arbre Genealògic</h1>
+    <p class="subtitle">Crea, edita i visualitza la teva família · Tot es desa al teu navegador</p>
+  </header>
+
+  <main>
+    <!-- Panel de controls -->
+    <aside class="sidebar">
+      <section class="card">
+        <h2>Afegir / Editar persona</h2>
+        <form id="person-form">
+          <input type="hidden" id="person-id" />
+          <div class="form-group">
+            <label for="name">Nom complet *</label>
+            <input type="text" id="name" required placeholder="Ex: Maria Garcia López" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="birth">Any de naixement</label>
+              <input type="number" id="birth" min="1000" max="2100" placeholder="1950" />
+            </div>
+            <div class="form-group">
+              <label for="death">Any de defunció</label>
+              <input type="number" id="death" min="1000" max="2100" placeholder="opcional" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="gender">Gènere</label>
+            <select id="gender">
+              <option value="unknown">No especificat</option>
+              <option value="female">Dona</option>
+              <option value="male">Home</option>
+              <option value="other">Altre</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="notes">Notes</label>
+            <textarea id="notes" rows="2" placeholder="Lloc de naixement, professió..."></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn primary" id="save-btn">Desar persona</button>
+            <button type="button" class="btn" id="cancel-btn" hidden>Cancel·lar</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Persones (<span id="people-count">0</span>)</h2>
+        <div class="search-box">
+          <input type="search" id="search" placeholder="Cercar persona..." />
+        </div>
+        <ul id="people-list" class="people-list"></ul>
+      </section>
+
+      <section class="card actions-card">
+        <h2>Dades</h2>
+        <div class="btn-group">
+          <button class="btn" id="export-btn">📤 Exportar JSON</button>
+          <button class="btn" id="import-btn">📥 Importar JSON</button>
+          <input type="file" id="import-file" accept=".json" hidden />
+          <button class="btn danger" id="clear-btn">🗑️ Esborrar-ho tot</button>
+        </div>
+        <p class="hint">Les dades es desen automàticament en aquest navegador.</p>
+      </section>
+    </aside>
+
+    <!-- Visualització de l'arbre -->
+    <section class="tree-panel">
+      <div class="tree-toolbar">
+        <label>
+          Centrar a:
+          <select id="root-select">
+            <option value="">— Selecciona una persona —</option>
+          </select>
+        </label>
+        <div class="zoom-controls">
+          <button class="btn small" id="zoom-out" title="Allunyar">−</button>
+          <button class="btn small" id="zoom-reset" title="Restablir">⟲</button>
+          <button class="btn small" id="zoom-in" title="Apropar">+</button>
+        </div>
+      </div>
+      <div id="tree-container">
+        <div id="tree-canvas">
+          <p class="empty-state">
+            Afegeix persones i selecciona'n una per veure l'arbre genealògic.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal de relacions -->
+  <dialog id="relations-modal">
+    <form method="dialog" id="relations-form">
+      <h2 id="relations-title">Relacions de …</h2>
+      <div class="form-group">
+        <label>Pare</label>
+        <select id="father-select"></select>
+      </div>
+      <div class="form-group">
+        <label>Mare</label>
+        <select id="mother-select"></select>
+      </div>
+      <div class="form-group">
+        <label>Cònjuge / Parella</label>
+        <select id="spouse-select"></select>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn primary">Desar relacions</button>
+        <button type="button" class="btn" id="close-relations">Tancar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer>
+    <p>
+      Fet amb ❤️ · Dades privades (només al teu navegador) ·
+      <a href="https://github.com" target="_blank" rel="noopener">Puja aquest projecte a GitHub</a>
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
