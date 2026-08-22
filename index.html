@@ -9,28 +9,54 @@
 </head>
 <body>
   <header>
-    <h1>🌳 Arbre Genealògic</h1>
-    <p class="subtitle">Crea, edita i visualitza la teva família · Tot es desa al teu navegador</p>
+    <div class="header-inner">
+      <h1>🌳 La meva família</h1>
+      <p class="subtitle">Tot l’arbre d’un sol cop d’ull</p>
+    </div>
   </header>
 
   <main>
-    <!-- Formulari sempre a dalt -->
+    <section class="toolbar card">
+      <div class="toolbar-row">
+        <label class="focus-label">
+          Jo sóc:
+          <select id="root-select">
+            <option value="">— Tria’t a tu —</option>
+          </select>
+        </label>
+        <div class="zoom-controls">
+          <button type="button" class="btn icon" id="zoom-out" title="Allunyar">−</button>
+          <button type="button" class="btn icon" id="zoom-reset" title="Restablir">⟲</button>
+          <button type="button" class="btn icon" id="zoom-in" title="Apropar">+</button>
+        </div>
+      </div>
+      <p class="hint-inline">Clica qualsevol persona per afegir pare, mare, germà, fill o parella.</p>
+    </section>
+
+    <section class="tree-panel card">
+      <div id="tree-container">
+        <div id="tree-canvas">
+          <p class="empty-state">Afegeix la primera persona més avall.<br>Després tria “Jo sóc” per veure tot l’arbre.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="card form-card">
-      <h2>Afegir / Editar persona</h2>
+      <h2>Afegir o editar persona</h2>
       <form id="person-form">
         <input type="hidden" id="person-id" />
         <div class="form-group">
           <label for="name">Nom complet *</label>
-          <input type="text" id="name" required placeholder="Ex: Maria Garcia López" />
+          <input type="text" id="name" required placeholder="Ex: Maria Garcia" />
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label for="birth">Any de naixement</label>
+            <label for="birth">Naixement</label>
             <input type="number" id="birth" min="1000" max="2100" placeholder="1950" />
           </div>
           <div class="form-group">
-            <label for="death">Any de defunció</label>
-            <input type="number" id="death" min="1000" max="2100" placeholder="opcional" />
+            <label for="death">Defunció</label>
+            <input type="number" id="death" min="1000" max="2100" placeholder="—" />
           </div>
         </div>
         <div class="form-group">
@@ -44,84 +70,51 @@
         </div>
         <div class="form-group">
           <label for="notes">Notes</label>
-          <textarea id="notes" rows="2" placeholder="Lloc de naixement, professió..."></textarea>
+          <textarea id="notes" rows="2" placeholder="Lloc, professió…"></textarea>
         </div>
         <div class="form-actions">
-          <button type="submit" class="btn primary" id="save-btn">Desar persona</button>
+          <button type="submit" class="btn primary" id="save-btn">Desar</button>
           <button type="button" class="btn" id="cancel-btn" hidden>Cancel·lar</button>
         </div>
       </form>
     </section>
 
-    <!-- Arbre (principal) -->
-    <section class="tree-panel">
-      <div class="tree-toolbar">
-        <span class="tree-hint">Clica una persona per afegir família · Totes les persones es mostren a l'arbre</span>
-        <div class="zoom-controls">
-          <button class="btn small" id="zoom-out" title="Allunyar">−</button>
-          <button class="btn small" id="zoom-reset" title="Restablir">⟲</button>
-          <button class="btn small" id="zoom-in" title="Apropar">+</button>
-        </div>
-      </div>
-      <div id="tree-container">
-        <div id="tree-canvas">
-          <p class="empty-state">Afegeix la primera persona amb el formulari de dalt.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Persones + Dades al final -->
-    <section class="bottom-panels">
+    <section class="bottom-row">
       <div class="card">
         <h2>Persones (<span id="people-count">0</span>)</h2>
         <div class="search-box">
-          <input type="search" id="search" placeholder="Cercar persona..." />
+          <input type="search" id="search" placeholder="Cercar…" />
         </div>
         <ul id="people-list" class="people-list"></ul>
       </div>
       <div class="card">
         <h2>Dades</h2>
         <div class="btn-group">
-          <button class="btn" id="export-btn">📤 Exportar JSON</button>
-          <button class="btn" id="import-btn">📥 Importar JSON</button>
+          <button type="button" class="btn" id="export-btn">Exportar JSON</button>
+          <button type="button" class="btn" id="import-btn">Importar JSON</button>
           <input type="file" id="import-file" accept=".json" hidden />
-          <button class="btn danger" id="clear-btn">🗑️ Esborrar-ho tot</button>
+          <button type="button" class="btn danger" id="clear-btn">Esborrar-ho tot</button>
         </div>
-        <p class="hint">Les dades es desen automàticament en aquest navegador.</p>
+        <p class="hint">Es desa sol al teu navegador.</p>
       </div>
     </section>
   </main>
 
   <dialog id="relations-modal">
     <form method="dialog" id="relations-form">
-      <h2 id="relations-title">Relacions de …</h2>
-      <div class="form-group">
-        <label>Pare</label>
-        <select id="father-select"></select>
-      </div>
-      <div class="form-group">
-        <label>Mare</label>
-        <select id="mother-select"></select>
-      </div>
-      <div class="form-group">
-        <label>Cònjuge / Parella</label>
-        <select id="spouse-select"></select>
-      </div>
+      <h2 id="relations-title">Relacions</h2>
+      <div class="form-group"><label>Pare</label><select id="father-select"></select></div>
+      <div class="form-group"><label>Mare</label><select id="mother-select"></select></div>
+      <div class="form-group"><label>Cònjuge</label><select id="spouse-select"></select></div>
       <div class="form-actions">
-        <button type="submit" class="btn primary">Desar relacions</button>
+        <button type="submit" class="btn primary">Desar</button>
         <button type="button" class="btn" id="close-relations">Tancar</button>
       </div>
     </form>
   </dialog>
 
-  <!-- hidden selects for compatibility -->
-  <select id="root-select" hidden></select>
-
   <footer>
-    <p>
-      Fet amb ❤️ · Dades privades (només al teu navegador) ·
-      <a href="https://github.com" target="_blank" rel="noopener">Puja aquest projecte a GitHub</a>
-    </p>
+    <p>La teva història familiar · Dades només al teu dispositiu</p>
   </footer>
 
   <script src="app.js"></script>
