@@ -14,75 +14,49 @@
   </header>
 
   <main>
-    <!-- Panel de controls -->
-    <aside class="sidebar">
-      <section class="card">
-        <h2>Afegir / Editar persona</h2>
-        <form id="person-form">
-          <input type="hidden" id="person-id" />
-          <div class="form-group">
-            <label for="name">Nom complet *</label>
-            <input type="text" id="name" required placeholder="Ex: Maria Garcia López" />
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="birth">Any de naixement</label>
-              <input type="number" id="birth" min="1000" max="2100" placeholder="1950" />
-            </div>
-            <div class="form-group">
-              <label for="death">Any de defunció</label>
-              <input type="number" id="death" min="1000" max="2100" placeholder="opcional" />
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="gender">Gènere</label>
-            <select id="gender">
-              <option value="unknown">No especificat</option>
-              <option value="female">Dona</option>
-              <option value="male">Home</option>
-              <option value="other">Altre</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="notes">Notes</label>
-            <textarea id="notes" rows="2" placeholder="Lloc de naixement, professió..."></textarea>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn primary" id="save-btn">Desar persona</button>
-            <button type="button" class="btn" id="cancel-btn" hidden>Cancel·lar</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>Persones (<span id="people-count">0</span>)</h2>
-        <div class="search-box">
-          <input type="search" id="search" placeholder="Cercar persona..." />
+    <!-- Formulari sempre a dalt -->
+    <section class="card form-card">
+      <h2>Afegir / Editar persona</h2>
+      <form id="person-form">
+        <input type="hidden" id="person-id" />
+        <div class="form-group">
+          <label for="name">Nom complet *</label>
+          <input type="text" id="name" required placeholder="Ex: Maria Garcia López" />
         </div>
-        <ul id="people-list" class="people-list"></ul>
-      </section>
-
-      <section class="card actions-card">
-        <h2>Dades</h2>
-        <div class="btn-group">
-          <button class="btn" id="export-btn">📤 Exportar JSON</button>
-          <button class="btn" id="import-btn">📥 Importar JSON</button>
-          <input type="file" id="import-file" accept=".json" hidden />
-          <button class="btn danger" id="clear-btn">🗑️ Esborrar-ho tot</button>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="birth">Any de naixement</label>
+            <input type="number" id="birth" min="1000" max="2100" placeholder="1950" />
+          </div>
+          <div class="form-group">
+            <label for="death">Any de defunció</label>
+            <input type="number" id="death" min="1000" max="2100" placeholder="opcional" />
+          </div>
         </div>
-        <p class="hint">Les dades es desen automàticament en aquest navegador.</p>
-      </section>
-    </aside>
+        <div class="form-group">
+          <label for="gender">Gènere</label>
+          <select id="gender">
+            <option value="unknown">No especificat</option>
+            <option value="female">Dona</option>
+            <option value="male">Home</option>
+            <option value="other">Altre</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="notes">Notes</label>
+          <textarea id="notes" rows="2" placeholder="Lloc de naixement, professió..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn primary" id="save-btn">Desar persona</button>
+          <button type="button" class="btn" id="cancel-btn" hidden>Cancel·lar</button>
+        </div>
+      </form>
+    </section>
 
-    <!-- Visualització de l'arbre -->
+    <!-- Arbre (principal) -->
     <section class="tree-panel">
       <div class="tree-toolbar">
-        <label>
-          Centrar a:
-          <select id="root-select">
-            <option value="">— Selecciona una persona —</option>
-          </select>
-        </label>
+        <span class="tree-hint">Clica una persona per afegir família · Totes les persones es mostren a l'arbre</span>
         <div class="zoom-controls">
           <button class="btn small" id="zoom-out" title="Allunyar">−</button>
           <button class="btn small" id="zoom-reset" title="Restablir">⟲</button>
@@ -91,15 +65,33 @@
       </div>
       <div id="tree-container">
         <div id="tree-canvas">
-          <p class="empty-state">
-            Afegeix persones i selecciona'n una per veure l'arbre genealògic.
-          </p>
+          <p class="empty-state">Afegeix la primera persona amb el formulari de dalt.</p>
         </div>
+      </div>
+    </section>
+
+    <!-- Persones + Dades al final -->
+    <section class="bottom-panels">
+      <div class="card">
+        <h2>Persones (<span id="people-count">0</span>)</h2>
+        <div class="search-box">
+          <input type="search" id="search" placeholder="Cercar persona..." />
+        </div>
+        <ul id="people-list" class="people-list"></ul>
+      </div>
+      <div class="card">
+        <h2>Dades</h2>
+        <div class="btn-group">
+          <button class="btn" id="export-btn">📤 Exportar JSON</button>
+          <button class="btn" id="import-btn">📥 Importar JSON</button>
+          <input type="file" id="import-file" accept=".json" hidden />
+          <button class="btn danger" id="clear-btn">🗑️ Esborrar-ho tot</button>
+        </div>
+        <p class="hint">Les dades es desen automàticament en aquest navegador.</p>
       </div>
     </section>
   </main>
 
-  <!-- Modal de relacions -->
   <dialog id="relations-modal">
     <form method="dialog" id="relations-form">
       <h2 id="relations-title">Relacions de …</h2>
@@ -121,6 +113,9 @@
       </div>
     </form>
   </dialog>
+
+  <!-- hidden selects for compatibility -->
+  <select id="root-select" hidden></select>
 
   <footer>
     <p>
