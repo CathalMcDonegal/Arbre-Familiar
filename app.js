@@ -1,10 +1,20 @@
 /**
- * Arbre genealògic – vista completa per generacions, sense repeticions
+ * Arbre genealògic piramidal (dalt = grans, baix = joves)
+ * Parelles al costat · Fills pengen a sota
+ * Les dades NO s'esborren en actualitzar (migra claus antigues)
  */
-const STORAGE_KEY = "arbre-genealogic-v5";
+const STORAGE_KEY = "arbre-genealogic-data";
+const OLD_KEYS = [
+  "arbre-genealogic-v5",
+  "arbre-genealogic-v4",
+  "arbre-genealogic-v3",
+  "arbre-genealogic-v2",
+  "arbre-genealogic-v1",
+  "arbol-genealogico-v1",
+];
 
 let people = [];
-let meId = null; // "Jo sóc"
+let focusId = null;
 let scale = 1;
 let menuPersonId = null;
 
@@ -23,10 +33,6 @@ const peopleCount = $("people-count");
 const searchInput = $("search");
 const rootSelect = $("root-select");
 const treeCanvas = $("tree-canvas");
-const exportBtn = $("export-btn");
-const importBtn = $("import-btn");
-const importFile = $("import-file");
-const clearBtn = $("clear-btn");
 
 const personMenu = document.createElement("div");
 personMenu.className = "person-menu";
@@ -38,7 +44,7 @@ personMenu.innerHTML = `
   <button data-a="spouse">💍 Parella</button>
   <div class="sep"></div>
   <button data-a="edit">✏️ Editar</button>
-  <button data-a="me">👤 Jo sóc aquesta persona</button>
+  <button data-a="focus">📍 Punt de partida</button>
   <div class="sep"></div>
   <button data-a="del" style="color:#8b3a2a">🗑️ Eliminar</button>
 `;
@@ -47,26 +53,71 @@ document.body.appendChild(personMenu);
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
+
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ people, meId }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ people, focusId }));
 }
+
+function normalizePerson(p) {
+  return {
+    id: p.id,
+    name: p.name || "Sense nom",
+    birth: p.birth ?? null,
+    death: p.death ?? null,
+    gender: p.gender || "unknown",
+    notes: p.notes || "",
+    fatherId: p.fatherId || null,
+    motherId: p.motherId || null,
+    spouseId: p.spouseId || null,
+  };
+}
+
 function load() {
+  // 1) Clau actual
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    if (Array.isArray(data)) {
-      people = data;
-      meId = people[0]?.id || null;
-    } else {
-      people = data.people || [];
-      meId = data.meId || (people[0]?.id ?? null);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (Array.isArray(data)) {
+        people = data.map(normalizePerson);
+        focusId = people[0]?.id || null;
+        return;
+      }
+      if (data && Array.isArray(data.people)) {
+        people = data.people.map(normalizePerson);
+        focusId = data.focusId || data.meId || people[0]?.id || null;
+        return;
+      }
     }
-  } catch {
-    people = [];
-    meId = null;
+  } catch (_) {}
+
+  // 2) Migrar claus antigues (NO perdre dades en actualitzar)
+  for (const key of OLD_KEYS) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const data = JSON.parse(raw);
+      let list = null;
+      let fid = null;
+      if (Array.isArray(data)) {
+        list = data;
+      } else if (data && Array.isArray(data.people)) {
+        list = data.people;
+        fid = data.focusId || data.meId || null;
+      }
+      if (list && list.length) {
+        people = list.map(normalizePerson);
+        focusId = fid || people[0]?.id || null;
+        save(); // desar a la clau nova
+        return;
+      }
+    } catch (_) {}
   }
+
+  people = [];
+  focusId = null;
 }
+
 function get(id) {
   return people.find((p) => p.id === id);
 }
@@ -83,11 +134,12 @@ function esc(s) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
-function dead(p) {
+function isDead(p) {
   return p.death != null && p.death !== "";
 }
-function childrenOf(id) {
-  return people.filter((p) => p.fatherId === id || p.motherId === id);
+function childrenOf(...ids) {
+  const set = new Set(ids.filter(Boolean));
+  return people.filter((p) => set.has(p.fatherId) || set.has(p.motherId));
 }
 
 function promptPerson(label, defaultGender) {
@@ -121,7 +173,8 @@ function linkSpouse(a, b) {
 
 function addFather(id) {
   const p = get(id);
-  if (!p || p.fatherId) return alert(p?.fatherId ? "Ja té pare." : "");
+  if (!p) return;
+  if (p.fatherId) return alert("Ja té pare.");
   const n = promptPerson("pare", "male");
   if (!n) return;
   p.fatherId = n.id;
@@ -134,7 +187,8 @@ function addFather(id) {
 }
 function addMother(id) {
   const p = get(id);
-  if (!p || p.motherId) return alert(p?.motherId ? "Ja té mare." : "");
+  if (!p) return;
+  if (p.motherId) return alert("Ja té mare.");
   const n = promptPerson("mare", "female");
   if (!n) return;
   p.motherId = n.id;
@@ -173,7 +227,8 @@ function addChild(id) {
 }
 function addSpouse(id) {
   const p = get(id);
-  if (!p || p.spouseId) return alert(p?.spouseId ? "Ja té parella." : "");
+  if (!p) return;
+  if (p.spouseId) return alert("Ja té parella.");
   const def = p.gender === "male" ? "female" : p.gender === "female" ? "male" : null;
   const n = promptPerson("parella", def);
   if (!n) return;
@@ -185,7 +240,7 @@ function addSpouse(id) {
 function showMenu(id, x, y) {
   menuPersonId = id;
   personMenu.classList.add("open");
-  const w = 210, h = 320;
+  const w = 200, h = 310;
   let left = x, top = y;
   if (left + w > innerWidth) left = innerWidth - w - 8;
   if (top + h > innerHeight) top = innerHeight - h - 8;
@@ -209,8 +264,8 @@ personMenu.addEventListener("click", (e) => {
   else if (a === "child") addChild(id);
   else if (a === "spouse") addSpouse(id);
   else if (a === "edit") startEdit(id);
-  else if (a === "me") {
-    meId = id;
+  else if (a === "focus") {
+    focusId = id;
     save();
     render();
   } else if (a === "del") {
@@ -222,7 +277,7 @@ personMenu.addEventListener("click", (e) => {
       if (o.spouseId === id) o.spouseId = null;
     });
     people = people.filter((x) => x.id !== id);
-    if (meId === id) meId = people[0]?.id || null;
+    if (focusId === id) focusId = people[0]?.id || null;
     save();
     render();
   }
@@ -231,255 +286,18 @@ document.addEventListener("click", (e) => {
   if (!personMenu.contains(e.target) && !e.target.closest(".person")) hideMenu();
 });
 
-/**
- * Construeix generacions sense repeticions al voltant de "me".
- * Inclou: avis, pares, sogres, jo+parella, germans, cunyats, fills, néts.
- */
-function buildGenerations(me) {
-  const used = new Set();
-  const mark = (p) => {
-    if (!p || used.has(p.id)) return false;
-    used.add(p.id);
-    return true;
-  };
+/* ——— Pyramid layout ——— */
 
-  const gens = []; // { label, units: [{ members: person[], role }] }
-
-  // Helpers
-  const parentsOf = (p) => {
-    const arr = [];
-    if (p.fatherId) {
-      const f = get(p.fatherId);
-      if (f) arr.push(f);
-    }
-    if (p.motherId) {
-      const m = get(p.motherId);
-      if (m) arr.push(m);
-    }
-    return arr;
-  };
-
-  // —— Besavis (pares dels avis) ——
-  const gp = parentsOf(me);
-  const ggp = [];
-  gp.forEach((g) => parentsOf(g).forEach((x) => ggp.push(x)));
-  const spouse = me.spouseId ? get(me.spouseId) : null;
-  if (spouse) {
-    parentsOf(spouse).forEach((sg) => parentsOf(sg).forEach((x) => ggp.push(x)));
-  }
-  if (ggp.length) {
-    const units = [];
-    const seen = new Set();
-    ggp.forEach((p) => {
-      if (seen.has(p.id)) return;
-      const pair = [p];
-      seen.add(p.id);
-      if (p.spouseId) {
-        const s = get(p.spouseId);
-        if (s && !seen.has(s.id)) {
-          pair.push(s);
-          seen.add(s.id);
-        }
-      }
-      pair.forEach((x) => mark(x));
-      units.push({ members: pair, role: "Besavis" });
-    });
-    if (units.length) gens.push({ label: "Besavis", units });
-  }
-
-  // —— Avis (paterns + materns + de la parella) ——
-  const grandparents = [];
-  gp.forEach((g) => grandparents.push(g));
-  if (spouse) parentsOf(spouse).forEach((g) => grandparents.push(g));
-  if (grandparents.length) {
-    const units = [];
-    const seen = new Set();
-    grandparents.forEach((p) => {
-      if (seen.has(p.id) || used.has(p.id)) return;
-      const pair = [p];
-      seen.add(p.id);
-      if (p.spouseId) {
-        const s = get(p.spouseId);
-        if (s && !seen.has(s.id) && !used.has(s.id)) {
-          pair.push(s);
-          seen.add(s.id);
-        }
-      }
-      pair.forEach((x) => mark(x));
-      units.push({ members: pair, role: "Avis" });
-    });
-    if (units.length) gens.push({ label: "Avis", units });
-  }
-
-  // —— Pares i sogres ——
-  const parentGen = [];
-  parentsOf(me).forEach((p) => parentGen.push({ p, role: p.gender === "female" ? "Mare" : p.gender === "male" ? "Pare" : "Progenitor" }));
-  if (spouse) {
-    parentsOf(spouse).forEach((p) =>
-      parentGen.push({ p, role: p.gender === "female" ? "Sogra" : p.gender === "male" ? "Sogre" : "Sogre/a" })
-    );
-  }
-  if (parentGen.length) {
-    const units = [];
-    const seen = new Set();
-    // agrupar en parelles si són cònjuges
-    parentGen.forEach(({ p, role }) => {
-      if (seen.has(p.id) || used.has(p.id)) return;
-      const pair = [{ person: p, role }];
-      seen.add(p.id);
-      if (p.spouseId) {
-        const s = get(p.spouseId);
-        if (s && !seen.has(s.id) && !used.has(s.id)) {
-          const r2 = parentGen.find((x) => x.p.id === s.id)?.role || "Parella";
-          pair.push({ person: s, role: r2 });
-          seen.add(s.id);
-        }
-      }
-      pair.forEach((x) => mark(x.person));
-      units.push({ members: pair.map((x) => x.person), roles: pair.map((x) => x.role) });
-    });
-    if (units.length) gens.push({ label: "Pares i sogres", units });
-  }
-
-  // —— Generació actual: jo, parella, germans, cunyats ——
-  const mySibs = childrenOf(me.fatherId || me.motherId || "___").filter(
-    (c) => c.id !== me.id && (c.fatherId === me.fatherId || c.motherId === me.motherId)
-  );
-  // millor: germans reals
-  const siblings = people.filter(
-    (c) =>
-      c.id !== me.id &&
-      ((me.fatherId && c.fatherId === me.fatherId) || (me.motherId && c.motherId === me.motherId))
-  );
-
-  const currentUnits = [];
-  // Jo + parella
-  {
-    const pair = [me];
-    mark(me);
-    const roles = ["Jo"];
-    if (spouse && mark(spouse)) {
-      pair.push(spouse);
-      roles.push("Parella");
-    }
-    currentUnits.push({ members: pair, roles });
-  }
-  // Germans
-  siblings.forEach((s) => {
-    if (used.has(s.id)) return;
-    const pair = [s];
-    const roles = ["Germà/na"];
-    mark(s);
-    if (s.spouseId) {
-      const sp = get(s.spouseId);
-      if (sp && mark(sp)) {
-        pair.push(sp);
-        roles.push("Cunyat/da");
-      }
-    }
-    currentUnits.push({ members: pair, roles });
-  });
-  // Germans de la parella (cunyats)
-  if (spouse) {
-    const inLaws = people.filter(
-      (c) =>
-        c.id !== spouse.id &&
-        ((spouse.fatherId && c.fatherId === spouse.fatherId) ||
-          (spouse.motherId && c.motherId === spouse.motherId))
-    );
-    inLaws.forEach((s) => {
-      if (used.has(s.id)) return;
-      const pair = [s];
-      const roles = ["Cunyat/da"];
-      mark(s);
-      if (s.spouseId) {
-        const sp = get(s.spouseId);
-        if (sp && mark(sp)) {
-          pair.push(sp);
-          roles.push("Parella");
-        }
-      }
-      currentUnits.push({ members: pair, roles });
-    });
-  }
-  if (currentUnits.length) gens.push({ label: "La meva generació", units: currentUnits });
-
-  // —— Fills ——
-  let kids = childrenOf(me.id);
-  if (spouse) {
-    childrenOf(spouse.id).forEach((c) => {
-      if (!kids.find((k) => k.id === c.id)) kids.push(c);
-    });
-  }
-  kids = kids.filter((k) => mark(k) || !used.has(k.id));
-  kids.forEach((k) => mark(k));
-  if (kids.length) {
-    const units = kids.map((k) => {
-      const pair = [k];
-      const roles = ["Fill/a"];
-      if (k.spouseId) {
-        const sp = get(k.spouseId);
-        if (sp && mark(sp)) {
-          pair.push(sp);
-          roles.push("Gendre/Nora");
-        }
-      }
-      return { members: pair, roles };
-    });
-    gens.push({ label: "Fills", units });
-  }
-
-  // —— Néts ——
-  const grandkids = [];
-  kids.forEach((k) => {
-    childrenOf(k.id).forEach((g) => {
-      if (!used.has(g.id)) {
-        grandkids.push(g);
-        mark(g);
-      }
-    });
-  });
-  if (grandkids.length) {
-    gens.push({
-      label: "Néts",
-      units: grandkids.map((g) => ({ members: [g], roles: ["Nét/a"] })),
-    });
-  }
-
-  // —— Resta (no encaixats) ——
-  const rest = people.filter((p) => !used.has(p.id));
-  if (rest.length) {
-    gens.push({
-      label: "Altres",
-      units: rest.map((p) => {
-        mark(p);
-        const pair = [p];
-        if (p.spouseId) {
-          const s = get(p.spouseId);
-          if (s && !used.has(s.id)) {
-            pair.push(s);
-            mark(s);
-          }
-        }
-        return { members: pair, roles: pair.map(() => "") };
-      }),
-    });
-  }
-
-  return gens;
-}
-
-function makeCard(p, role) {
+function makeCard(p) {
   const el = document.createElement("div");
   let cls = `person ${p.gender || "unknown"}`;
-  if (dead(p)) cls += " dead";
-  if (p.id === meId) cls += " me";
+  if (isDead(p)) cls += " dead";
+  if (p.id === focusId) cls += " focus";
   el.className = cls;
   el.dataset.id = p.id;
   el.innerHTML = `
     <div class="pname">${esc(p.name)}</div>
     <div class="pyears">${years(p)}</div>
-    ${role ? `<div class="prole">${esc(role)}</div>` : ""}
   `;
   el.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -488,58 +306,180 @@ function makeCard(p, role) {
   return el;
 }
 
+/** Puja fins als ancestres sense pares (cims de la piràmide) */
+function findRoots(startId) {
+  const start = get(startId);
+  if (!start) return [];
+
+  // Collect connected component via family links
+  const connected = new Set();
+  const queue = [startId];
+  while (queue.length) {
+    const id = queue.pop();
+    if (connected.has(id)) continue;
+    connected.add(id);
+    const p = get(id);
+    if (!p) continue;
+    [p.fatherId, p.motherId, p.spouseId].forEach((x) => {
+      if (x && !connected.has(x)) queue.push(x);
+    });
+    childrenOf(id).forEach((c) => {
+      if (!connected.has(c.id)) queue.push(c.id);
+    });
+  }
+
+  // Roots = people in component with no parent in component
+  const roots = [];
+  connected.forEach((id) => {
+    const p = get(id);
+    if (!p) return;
+    const hasFather = p.fatherId && connected.has(p.fatherId);
+    const hasMother = p.motherId && connected.has(p.motherId);
+    if (!hasFather && !hasMother) roots.push(p);
+  });
+
+  // Prefer not listing both spouses as separate roots if one is spouse of another root
+  const rootIds = new Set(roots.map((r) => r.id));
+  const filtered = roots.filter((r) => {
+    if (r.spouseId && rootIds.has(r.spouseId)) {
+      // keep the one that appears first by name, or the focus lineage
+      return r.id < r.spouseId;
+    }
+    return true;
+  });
+
+  return filtered.length ? filtered : [start];
+}
+
+/**
+ * Render recursive node:
+ * [Person] —dot— [Spouse]
+ *        |
+ *   [child1] [child2] ...
+ * each child can have spouse and own children
+ */
+function renderBranch(person, used) {
+  if (!person || used.has(person.id)) return null;
+  used.add(person.id);
+
+  const node = document.createElement("div");
+  node.className = "tree-node";
+
+  // Couple row
+  const couple = document.createElement("div");
+  couple.className = "couple";
+  couple.appendChild(makeCard(person));
+
+  let spouse = null;
+  if (person.spouseId) {
+    spouse = get(person.spouseId);
+    if (spouse && !used.has(spouse.id)) {
+      used.add(spouse.id);
+      const dot = document.createElement("div");
+      dot.className = "pair-dot";
+      dot.title = "Parella";
+      couple.appendChild(dot);
+      couple.appendChild(makeCard(spouse));
+    } else {
+      spouse = null;
+    }
+  }
+  node.appendChild(couple);
+
+  // Children of this person and/or spouse
+  const kids = childrenOf(person.id, spouse?.id).filter((c) => !used.has(c.id));
+  // stable order: by birth year then name
+  kids.sort((a, b) => {
+    if (a.birth && b.birth) return a.birth - b.birth;
+    if (a.birth) return -1;
+    if (b.birth) return 1;
+    return a.name.localeCompare(b.name, "ca");
+  });
+
+  if (kids.length) {
+    const stem = document.createElement("div");
+    stem.className = "stem";
+    node.appendChild(stem);
+
+    const wrap = document.createElement("div");
+    wrap.className = "children-wrap";
+
+    const row = document.createElement("div");
+    row.className = "children-row";
+
+    kids.forEach((kid) => {
+      const slot = document.createElement("div");
+      slot.className = "child-slot";
+      const cStem = document.createElement("div");
+      cStem.className = "child-stem";
+      slot.appendChild(cStem);
+      const branch = renderBranch(kid, used);
+      if (branch) slot.appendChild(branch);
+      row.appendChild(slot);
+    });
+
+    // Horizontal bar width approximation after layout
+    wrap.appendChild(row);
+    node.appendChild(wrap);
+
+    // Draw horizontal connector after DOM is ready
+    requestAnimationFrame(() => {
+      if (row.children.length < 2) return;
+      const first = row.children[0];
+      const last = row.children[row.children.length - 1];
+      const rowRect = row.getBoundingClientRect();
+      const fRect = first.getBoundingClientRect();
+      const lRect = last.getBoundingClientRect();
+      const bar = document.createElement("div");
+      bar.className = "children-bar";
+      const left = fRect.left + fRect.width / 2 - rowRect.left;
+      const right = lRect.left + lRect.width / 2 - rowRect.left;
+      bar.style.width = Math.max(0, right - left) + "px";
+      bar.style.marginLeft = left + "px";
+      bar.style.marginBottom = "0";
+      wrap.insertBefore(bar, row);
+    });
+  }
+
+  return node;
+}
+
 function renderTree() {
   treeCanvas.innerHTML = "";
   treeCanvas.style.transform = `scale(${scale})`;
 
   if (!people.length) {
-    treeCanvas.innerHTML = `<p class="empty-state">Afegeix la primera persona més avall.<br>Després tria “Jo sóc” per veure tot l’arbre.</p>`;
+    treeCanvas.innerHTML =
+      `<p class="empty-state">Afegeix persones amb el formulari.<br>Després tria un punt de partida.</p>`;
     return;
   }
 
-  if (!meId || !get(meId)) meId = people[0].id;
+  if (!focusId || !get(focusId)) focusId = people[0].id;
 
-  const me = get(meId);
-  const gens = buildGenerations(me);
+  const roots = findRoots(focusId);
+  const used = new Set();
 
-  gens.forEach((g, gi) => {
-    if (gi > 0) {
-      const conn = document.createElement("div");
-      conn.className = "gen-connector";
-      treeCanvas.appendChild(conn);
-    }
-    const block = document.createElement("div");
-    block.className = "gen-block";
-    const label = document.createElement("div");
-    label.className = "gen-label";
-    label.textContent = g.label;
-    block.appendChild(label);
+  const rootsRow = document.createElement("div");
+  rootsRow.className = "roots-row";
 
-    const row = document.createElement("div");
-    row.className = "gen-row";
-
-    g.units.forEach((u) => {
-      const unit = document.createElement("div");
-      unit.className = "unit";
-      const pair = document.createElement("div");
-      pair.className = "pair";
-      u.members.forEach((p, i) => {
-        if (i > 0) {
-          const link = document.createElement("div");
-          link.className = "pair-link";
-          link.title = "Parella";
-          pair.appendChild(link);
-        }
-        const role = u.roles?.[i] || "";
-        pair.appendChild(makeCard(p, role));
-      });
-      unit.appendChild(pair);
-      row.appendChild(unit);
-    });
-
-    block.appendChild(row);
-    treeCanvas.appendChild(block);
+  roots.forEach((r) => {
+    // If spouse already used as part of another root, skip
+    if (used.has(r.id)) return;
+    const branch = renderBranch(r, used);
+    if (branch) rootsRow.appendChild(branch);
   });
+
+  // Anyone not yet shown (disconnected) → small secondary roots
+  const rest = people.filter((p) => !used.has(p.id));
+  if (rest.length) {
+    rest.forEach((p) => {
+      if (used.has(p.id)) return;
+      const branch = renderBranch(p, used);
+      if (branch) rootsRow.appendChild(branch);
+    });
+  }
+
+  treeCanvas.appendChild(rootsRow);
 }
 
 function renderList(filter = "") {
@@ -556,15 +496,15 @@ function renderList(filter = "") {
     .sort((a, b) => a.name.localeCompare(b.name, "ca"))
     .forEach((p) => {
       const li = document.createElement("li");
-      if (p.id === meId) li.classList.add("active");
-      li.innerHTML = `<span class="name">${esc(p.name)}${dead(p) ? " †" : ""}</span>
+      if (p.id === focusId) li.classList.add("active");
+      li.innerHTML = `<span class="name">${esc(p.name)}${isDead(p) ? " †" : ""}</span>
         <span class="actions">
           <button data-menu="${p.id}" title="Menú">⋮</button>
           <button data-edit="${p.id}" title="Editar">✏️</button>
         </span>`;
       li.addEventListener("click", (e) => {
         if (e.target.closest("button")) return;
-        meId = p.id;
+        focusId = p.id;
         save();
         render();
       });
@@ -574,13 +514,13 @@ function renderList(filter = "") {
 
 function fillSelect() {
   rootSelect.innerHTML =
-    `<option value="">— Tria’t a tu —</option>` +
+    `<option value="">— Tria una persona —</option>` +
     people
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name, "ca"))
       .map((p) => `<option value="${p.id}">${esc(p.name)}</option>`)
       .join("");
-  if (meId) rootSelect.value = meId;
+  if (focusId) rootSelect.value = focusId;
 }
 
 function startEdit(id) {
@@ -625,7 +565,7 @@ form.addEventListener("submit", (e) => {
     Object.assign(ex, data);
   } else {
     people.push(data);
-    if (!meId) meId = id;
+    if (!focusId) focusId = id;
   }
   save();
   resetForm();
@@ -645,17 +585,17 @@ peopleList.addEventListener("click", (e) => {
 });
 searchInput.addEventListener("input", () => renderList(searchInput.value));
 rootSelect.addEventListener("change", () => {
-  meId = rootSelect.value || people[0]?.id || null;
+  focusId = rootSelect.value || people[0]?.id || null;
   save();
   render();
 });
 
 $("zoom-in").onclick = () => {
-  scale = Math.min(1.6, scale + 0.12);
+  scale = Math.min(1.5, scale + 0.1);
   treeCanvas.style.transform = `scale(${scale})`;
 };
 $("zoom-out").onclick = () => {
-  scale = Math.max(0.55, scale - 0.12);
+  scale = Math.max(0.5, scale - 0.1);
   treeCanvas.style.transform = `scale(${scale})`;
 };
 $("zoom-reset").onclick = () => {
@@ -663,42 +603,44 @@ $("zoom-reset").onclick = () => {
   treeCanvas.style.transform = `scale(1)`;
 };
 
-exportBtn.onclick = () => {
-  const blob = new Blob([JSON.stringify({ people, meId }, null, 2)], { type: "application/json" });
+$("export-btn").onclick = () => {
+  const blob = new Blob([JSON.stringify({ people, focusId }, null, 2)], {
+    type: "application/json",
+  });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `familia-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
 };
-importBtn.onclick = () => importFile.click();
-importFile.onchange = () => {
-  const f = importFile.files[0];
+$("import-btn").onclick = () => $("import-file").click();
+$("import-file").onchange = () => {
+  const f = $("import-file").files[0];
   if (!f) return;
   const r = new FileReader();
   r.onload = () => {
     try {
       const data = JSON.parse(r.result);
       if (Array.isArray(data)) {
-        people = data;
-        meId = people[0]?.id || null;
+        people = data.map(normalizePerson);
+        focusId = people[0]?.id || null;
       } else {
-        people = data.people || [];
-        meId = data.meId || people[0]?.id || null;
+        people = (data.people || []).map(normalizePerson);
+        focusId = data.focusId || data.meId || people[0]?.id || null;
       }
       save();
       render();
-      alert("Importat");
+      alert("Importat correctament");
     } catch (err) {
       alert("Error: " + err.message);
     }
-    importFile.value = "";
+    $("import-file").value = "";
   };
   r.readAsText(f);
 };
-clearBtn.onclick = () => {
-  if (!confirm("Esborrar TOT?")) return;
+$("clear-btn").onclick = () => {
+  if (!confirm("Esborrar TOT l'arbre?")) return;
   people = [];
-  meId = null;
+  focusId = null;
   save();
   render();
 };

@@ -9,19 +9,17 @@
 </head>
 <body>
   <header>
-    <div class="header-inner">
-      <h1>🌳 La meva família</h1>
-      <p class="subtitle">Tot l’arbre d’un sol cop d’ull</p>
-    </div>
+    <h1>🌳 La meva família</h1>
+    <p class="subtitle">Arbre piramidal · D’avis a néts</p>
   </header>
 
   <main>
     <section class="toolbar card">
       <div class="toolbar-row">
         <label class="focus-label">
-          Jo sóc:
+          Punt de partida:
           <select id="root-select">
-            <option value="">— Tria’t a tu —</option>
+            <option value="">— Tria una persona —</option>
           </select>
         </label>
         <div class="zoom-controls">
@@ -30,13 +28,13 @@
           <button type="button" class="btn icon" id="zoom-in" title="Apropar">+</button>
         </div>
       </div>
-      <p class="hint-inline">Clica qualsevol persona per afegir pare, mare, germà, fill o parella.</p>
+      <p class="hint-inline">Clica una persona per afegir pare, mare, germà, fill o parella. L’arbre es dibuixa de dalt (més grans) a baix (més joves).</p>
     </section>
 
     <section class="tree-panel card">
       <div id="tree-container">
         <div id="tree-canvas">
-          <p class="empty-state">Afegeix la primera persona més avall.<br>Després tria “Jo sóc” per veure tot l’arbre.</p>
+          <p class="empty-state">Afegeix persones amb el formulari.<br>Després tria un punt de partida per veure l’arbre.</p>
         </div>
       </div>
     </section>
@@ -95,23 +93,10 @@
           <input type="file" id="import-file" accept=".json" hidden />
           <button type="button" class="btn danger" id="clear-btn">Esborrar-ho tot</button>
         </div>
-        <p class="hint">Es desa sol al teu navegador.</p>
+        <p class="hint">Es desa sol al teu navegador. Les actualitzacions no esborren les dades.</p>
       </div>
     </section>
   </main>
-
-  <dialog id="relations-modal">
-    <form method="dialog" id="relations-form">
-      <h2 id="relations-title">Relacions</h2>
-      <div class="form-group"><label>Pare</label><select id="father-select"></select></div>
-      <div class="form-group"><label>Mare</label><select id="mother-select"></select></div>
-      <div class="form-group"><label>Cònjuge</label><select id="spouse-select"></select></div>
-      <div class="form-actions">
-        <button type="submit" class="btn primary">Desar</button>
-        <button type="button" class="btn" id="close-relations">Tancar</button>
-      </div>
-    </form>
-  </dialog>
 
   <footer>
     <p>La teva història familiar · Dades només al teu dispositiu</p>
