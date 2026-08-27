@@ -10,31 +10,38 @@
 <body>
   <header>
     <h1>🌳 La meva família</h1>
-    <p class="subtitle">Arbre piramidal · D’avis a néts</p>
+    <p class="subtitle">Arbre genealògic · Estil pergamí</p>
   </header>
 
   <main>
     <section class="toolbar card">
       <div class="toolbar-row">
         <label class="focus-label">
-          Punt de partida:
+          Jo sóc:
           <select id="root-select">
-            <option value="">— Tria una persona —</option>
+            <option value="">— Tria’t a tu —</option>
           </select>
         </label>
         <div class="zoom-controls">
-          <button type="button" class="btn icon" id="zoom-out" title="Allunyar">−</button>
-          <button type="button" class="btn icon" id="zoom-reset" title="Restablir">⟲</button>
-          <button type="button" class="btn icon" id="zoom-in" title="Apropar">+</button>
+          <button type="button" class="btn icon" id="zoom-out">−</button>
+          <button type="button" class="btn icon" id="zoom-reset">⟲</button>
+          <button type="button" class="btn icon" id="zoom-in">+</button>
         </div>
       </div>
-      <p class="hint-inline">Clica una persona per afegir pare, mare, germà, fill o parella. L’arbre es dibuixa de dalt (més grans) a baix (més joves).</p>
+      <div class="legend">
+        <span class="leg"><i class="sym male"></i> Home</span>
+        <span class="leg"><i class="sym female"></i> Dona</span>
+        <span class="leg"><i class="line-rel"></i> Relació</span>
+        <span class="leg"><i class="line-des"></i> Descendència</span>
+        <span class="leg"><i class="line-sib"></i> Germandat</span>
+      </div>
+      <p class="hint-inline">Clica una persona per afegir pare, mare, germà, fill o parella.</p>
     </section>
 
     <section class="tree-panel card">
       <div id="tree-container">
         <div id="tree-canvas">
-          <p class="empty-state">Afegeix persones amb el formulari.<br>Després tria un punt de partida per veure l’arbre.</p>
+          <p class="empty-state">Afegeix persones i tria “Jo sóc” per veure l’arbre.</p>
         </div>
       </div>
     </section>
@@ -93,15 +100,14 @@
           <input type="file" id="import-file" accept=".json" hidden />
           <button type="button" class="btn danger" id="clear-btn">Esborrar-ho tot</button>
         </div>
-        <p class="hint">Es desa sol al teu navegador. Les actualitzacions no esborren les dades.</p>
+        <p class="hint">Les actualitzacions no esborren les teves dades.</p>
       </div>
     </section>
   </main>
 
   <footer>
-    <p>La teva història familiar · Dades només al teu dispositiu</p>
+    <p>Història familiar · Dades només al teu dispositiu</p>
   </footer>
-
   <script src="app.js"></script>
 </body>
 </html>
